@@ -78,6 +78,37 @@ def card4(rank: int, suit: Suit) -> Card:
     return class_(str(rank), suit)
 
 
+# This is not desirable. It involves a repetition of the sequence of the mapping keys 1, 11, 12, 13. Repetition is bad,
+# because parallel structures never seem to stay that way after the software has been updated or revised.
+def card5(rank: int, suit: Suit) -> Card:
+    class_ = {1: AceCard, 11: FaceCard, 12: FaceCard, 13: FaceCard}.get(rank, Card)
+    rank_str = {1: "A", 11: "J", 12: "Q", 13: "K"}.get(rank, str(rank))
+    return class_(rank_str, suit)
+
+
+def card6(rank: int, suit: Suit) -> Card:
+    class_, rank_str = {
+        1: (AceCard, "A"),
+        11: (FaceCard, "J"),
+        12: (FaceCard, "Q"),
+        13: (FaceCard, "K")
+    }.get(rank, (Card, str(rank),))
+    return class_(rank_str, suit)
+
+
+# In general, partial functions aren't helpful for most object-oriented programming. When building complex objects,
+# it is common to define methods that accept arguments incrementally. Instead of using rank to create a partial
+# function, a more bo object-oriented approach is to use separate methods to set rank and suit
+def card7(rank: int, suit: Suit) -> Card:
+    class_rank = {
+        1: lambda suit: AceCard("A", suit),
+        11: lambda suit: FaceCard("J", suit),
+        12: lambda suit: FaceCard("Q", suit),
+        13: lambda suit: FaceCard("K", suit),
+    }.get(rank, lambda suit: Card(str(rank), suit))
+    return class_rank(suit)
+
+
 if __name__ == '__main__':
     deck = [card(rank, suit)
             for rank in range(1, 14) for suit in iter(Suit)]  # iter suppresses error message from mypy

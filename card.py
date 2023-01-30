@@ -1,5 +1,6 @@
-from typing import Tuple
+from typing import Tuple, List, Any, cast
 from enum import Enum
+import sys
 
 
 class Suit(str, Enum):  # as a subclass of Enum, it makes Suit class immutable and iterable
@@ -17,6 +18,20 @@ class Card:
 
     def _points(self) -> Tuple[int, int]:
         return int(self.rank), int(self.rank)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__!s}(suit={self.suit!r}, rank={self.rank!r}"
+
+    def __str__(self) -> str:
+        return f"{self.rank}{self.suit}"
+
+    def __format__(self, format_spec: str) -> str:
+        if format_spec == "":
+            return str(self)
+        return_string = (
+            format_spec.replace("%r", self.rank).replace("%s", self.suit).replace("%%", "%")
+        )
+        return return_string
 
 
 class AceCard(Card):
@@ -40,14 +55,62 @@ def card(rank: int, suit: Suit) -> Card:
     raise Exception("Design Failure")
 
 
-def card2(rank: int, suit: Suit) -> Card:
-    if rank == 1:
-        return AceCard("A", suit)
-    elif 2 <= rank < 11:
-        return Card(str(rank), suit)
-    else:  # It is important to avoid a vague else clause. This will catch rank == 0, but only provides KeyError
-        name = {11: "J", 12: "Q", 13: "K"}[rank]
-        return FaceCard(name, suit)
+class Card2:
+    insure = False
+
+    def __init__(self, rank: str, suit: "Suit", hard: int, soft: int) -> None:
+        self.rank = rank
+        self.suit = suit
+        self.hard = hard
+        self.soft = soft
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(suit={self.suit!r}, rank={self.rank!r}"
+
+    def __str__(self) -> str:
+        return f"{self.rank}{self.suit}"
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            self.suit == cast(Card2, other).suit
+            and self.rank == cast(Card2, other).rank
+        )
+
+    def __hash__(self) -> int:
+        return (hash(self.suit) + 4 * hash(self.rank)) % sys.hash_info.modulus
+
+    def __format__(self, format_spec: str) -> str:
+        if format_spec == "":
+            return str(self)
+        rs = (
+            format_spec.replace("%r", self.rank).replace("%s", self.suit).replace("%%", "%")
+        )
+        return rs
+
+
+class NumberCard2(Card2):
+    def __init__(self, rank: int, suit: "Suit") -> None:
+        super().__init__(str(rank), suit, rank, rank)
+
+
+class AceCard2(Card2):
+    insure = True
+
+    def __init__(self, rank: int, suit: "Suit") -> None:
+        super().__init__("A", suit, 1, 11)
+
+
+class FaceCard2(Card2):
+    def __init__(self, rank: int, suit: "Suit") -> None:
+        rank_str = {11: "J", 12: "Q", 13: "K"}[rank]
+        super().__init__(rank_str, suit, 10, 10)
+
+
+def card2(rank: int, suit: Suit) -> Card2:
+    class_ = {1: AceCard2, 11: FaceCard2, 12: FaceCard2, 13: FaceCard2}.get(
+        rank, NumberCard2
+    )
+    return class_(rank, suit)
 
 
 def card3(rank: int, suit: Suit) -> Card:
@@ -109,10 +172,85 @@ def card7(rank: int, suit: Suit) -> Card:
     return class_rank(suit)
 
 
+class CardFactory:
+    def rank(self, rank: int) -> "CardFactory":
+        self.class_, self.rank_str = {
+            1: (AceCard, "A"),
+            11: (FaceCard, "J"),
+            12: (FaceCard, "Q"),
+            13: (FaceCard, "K"),
+        }.get(rank, (Card, str(rank)))
+        return self
+
+    def suit(self, suit: Suit) -> Card:
+        return self.class_(self.rank_str, suit)
+
+
+class Card3:
+    # due to the lack of __hash__ function, this class is mutable
+    def __init__(self, rank: str, suit: Suit, hard: int, soft: int) -> None:
+        self.rank = rank
+        self.suit = suit
+        self.hard = hard
+        self.soft = soft
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(suit={self.suit!r}, rank={self.rank!r}"
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}(suit={self.suit!r}, rank={self.rank!r}"
+
+    def __eq__(self, other: Any) -> bool:
+        return (
+            self.suit == cast(Card3, other).suit
+            and self.rank == cast(Card3, other).rank
+        )
+
+
+class NumberCard3(Card3):
+    def __init__(self, rank: int, suit: Suit) -> None:
+        super().__init__(str(rank), suit, rank, rank)
+
+
+class AceCard3(Card3):
+    def __init__(self, rank: int, suit: "Suit") -> None:
+        super().__init__("A", suit, 1, 11)
+
+
+class FaceCard3(Card3):
+    def __init__(self, rank: int, suit: Suit) -> None:
+        rank_str = {11: "J", 12: "Q", 13: "K"}[rank]
+        super().__init__(rank_str, suit, 10, 10)
+
+
+def card10(rank: int, suit: Suit) -> Card3:
+    if rank == 1:
+        return AceCard3(rank, suit)
+    elif 2 <= rank < 11:
+        return NumberCard3(rank, suit)
+    elif 11 <= rank < 14:
+        return FaceCard3(rank, suit)
+    else:
+        raise Exception("Rank out of range")
+
+
+def display_cards(list_of_cards: List[Card]):
+    for entry in list_of_cards:
+        print(f"{entry.rank} of {entry.suit}")
+
+
 if __name__ == '__main__':
-    deck = [card(rank, suit)
-            for rank in range(1, 14) for suit in iter(Suit)]  # iter suppresses error message from mypy
-    deck2 = [card2(rank, suit) for rank in range(13) for suit in iter(Suit)]  # fails when rank is 0, throws KeyError
-    deck4 = [card4(rank, suit) for rank in range(1, 14) for suit in iter(Suit)]
-    for card in deck4:
-        print(f"{card.rank} of {card.suit}")
+    # deck = [card(rank, suit)
+    #         for rank in range(1, 14) for suit in iter(Suit)]  # iter suppresses error message from mypy
+    # deck2 = [card2(rank, suit) for rank in range(13) for suit in iter(Suit)]  # fails when rank is 0, throws KeyError
+    # deck4 = [card4(rank, suit) for rank in range(1, 14) for suit in iter(Suit)]
+    # card8 = CardFactory()
+    # deck8 = [card8.rank(r + 1).suit(s) for r in range(13) for s in iter(Suit)]
+    # for card in deck8:
+    #     print(f"{card.rank} of {card.suit}")
+
+    # c = Card('2', Suit.Spade)
+    # print("Dealer has {0:%r of %s}".format(c))
+
+    print('test')
+
